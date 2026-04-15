@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DeadlineZone - Student Deadline Tracker</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">&#9201;</span>
+        <span class="logo-text">DeadlineZone</span>
+      </div>
+      <nav class="nav">
+        <a href="/" class="nav-link active" id="nav-home">Dashboard</a>
+        <a href="/add.html" class="nav-link" id="nav-add">+ Add Assignment</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main">
+
+    <!-- Summary Stats -->
+    <section class="stats-section">
+      <div class="stat-card stat-total">
+        <div class="stat-label">TOTAL</div>
+        <div class="stat-number" id="stat-total">--</div>
+      </div>
+      <div class="stat-card stat-pending">
+        <div class="stat-label">PENDING</div>
+        <div class="stat-number" id="stat-pending">--</div>
+      </div>
+      <div class="stat-card stat-due-soon">
+        <div class="stat-label">DUE SOON</div>
+        <div class="stat-number" id="stat-due-soon">--</div>
+      </div>
+      <div class="stat-card stat-overdue">
+        <div class="stat-label">OVERDUE</div>
+        <div class="stat-number" id="stat-overdue">--</div>
+      </div>
+      <div class="stat-card stat-done">
+        <div class="stat-label">DONE</div>
+        <div class="stat-number" id="stat-done">--</div>
+      </div>
+    </section>
+
+    <!-- Page heading + filters -->
+    <div class="list-header">
+      <h1 class="page-title">Your Assignments</h1>
+      <div class="filters" id="filters">
+        <button class="filter-btn active" data-filter="all">All</button>
+        <button class="filter-btn" data-filter="pending">Pending</button>
+        <button class="filter-btn" data-filter="done">Done</button>
+        <button class="filter-btn" data-filter="overdue">Overdue</button>
+      </div>
+    </div>
+
+    <!-- Assignment cards -->
+    <section class="cards-grid" id="cards-grid">
+      <div class="loading">Loading assignments...</div>
+    </section>
+
+    <!-- Empty state -->
+    <div class="empty-state hidden" id="empty-state">
+      <p>No assignments found.</p>
+      <a href="/add.html" class="btn btn-primary">Add your first assignment</a>
+    </div>
+
+  </main>
+
+  <!-- ===== NOTIFICATION BANNER ===== -->
+  <div class="notif-banner hidden" id="notif-banner">
+    <span id="notif-text"></span>
+    <button class="notif-close" onclick="document.getElementById('notif-banner').classList.add('hidden')">x</button>
+  </div>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

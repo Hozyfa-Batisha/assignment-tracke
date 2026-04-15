@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Add Assignment - DeadlineZone</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body>
+
+  <!-- ===== HEADER ===== -->
+  <header class="header">
+    <div class="header-inner">
+      <div class="logo">
+        <span class="logo-icon">&#9201;</span>
+        <span class="logo-text">DeadlineZone</span>
+      </div>
+      <nav class="nav">
+        <a href="/" class="nav-link" id="nav-home">Dashboard</a>
+        <a href="/add.html" class="nav-link active" id="nav-add">+ Add Assignment</a>
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== MAIN ===== -->
+  <main class="main main-narrow">
+
+    <div class="form-card">
+      <h1 class="form-title">Add New Assignment</h1>
+      <p class="form-subtitle">Fill in the details below to track your deadline.</p>
+
+      <!-- Error message box -->
+      <div class="alert alert-error hidden" id="form-error"></div>
+
+      <form id="add-form" novalidate>
+
+        <div class="form-group">
+          <label class="form-label" for="title">Assignment Title <span class="required">*</span></label>
+          <input
+            type="text"
+            id="title"
+            name="title"
+            class="form-input"
+            placeholder="e.g. Final Project Report"
+            required
+          />
+          <span class="field-error hidden" id="title-error">Title is required.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="course">Course / Subject <span class="required">*</span></label>
+          <input
+            type="text"
+            id="course"
+            name="course"
+            class="form-input"
+            placeholder="e.g. Web Programming"
+            required
+          />
+          <span class="field-error hidden" id="course-error">Course is required.</span>
+        </div>
+
+        <div class="form-group">
+          <label class="form-label" for="description">Description (optional)</label>
+          <textarea
+            id="description"
+            name="description"
+            class="form-input form-textarea"
+            placeholder="Any extra notes about this assignment..."
+            rows="3"
+          ></textarea>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label class="form-label" for="due_date">Due Date &amp; Time <span class="required">*</span></label>
+            <input
+              type="datetime-local"
+              id="due_date"
+              name="due_date"
+              class="form-input"
+              required
+            />
+            <span class="field-error hidden" id="due-date-error">Due date is required.</span>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" for="priority">Priority <span class="required">*</span></label>
+            <select id="priority" name="priority" class="form-input form-select">
+              <option value="low">Low</option>
+              <option value="medium" selected>Medium</option>
+              <option value="high">High</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <a href="/" class="btn btn-outline">Cancel</a>
+          <button type="submit" class="btn btn-primary" id="submit-btn">Add Assignment</button>
+        </div>
+
+      </form>
+    </div>
+
+  </main>
+
+  <script src="/js/app.js"></script>
+</body>
+</html>

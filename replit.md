@@ -2,46 +2,72 @@
 
 ## Overview
 
-pnpm workspace monorepo using TypeScript. Each package manages its own dependencies.
+Student Deadline Tracker — a web app built with PHP + HTML/CSS/JS + SQLite (SQL).
+Classic web stack, great for a CS course project.
 
 ## Stack
 
-- **Monorepo tool**: pnpm workspaces
-- **Node.js version**: 24
-- **Package manager**: pnpm
-- **TypeScript version**: 5.9
-- **API framework**: Express 5
-- **Database**: PostgreSQL + Drizzle ORM
-- **Validation**: Zod (`zod/v4`), `drizzle-zod`
-- **API codegen**: Orval (from OpenAPI spec)
-- **Build**: esbuild (CJS bundle)
-- **Frontend**: React + Vite (artifact: deadline-tracker)
+- **Frontend**: HTML, CSS (plain), JavaScript (vanilla, no frameworks)
+- **Backend**: PHP 8.2 (built-in development server)
+- **Database**: SQLite via PHP PDO (stored in `php-app/data/deadlines.db`)
+- **Monorepo tool**: pnpm workspaces (for supporting infrastructure)
 
-## Key Commands
+## Project Structure
 
-- `pnpm run typecheck` — full typecheck across all packages
-- `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- `pnpm --filter @workspace/api-server run dev` — run API server locally
+```
+php-app/
+├── router.php       # PHP built-in server router — routes /api/* to api.php
+├── db.php           # SQLite database connection + schema setup + seeding
+├── api.php          # REST API endpoints (GET/POST/PATCH/DELETE /api/assignments)
+├── index.html       # Dashboard page
+├── add.html         # Add Assignment form page
+├── css/
+│   └── style.css    # All styles (colorful, student-friendly theme)
+├── js/
+│   └── app.js       # All frontend JavaScript (fetch API, countdown timers)
+└── data/
+    └── deadlines.db # SQLite database file (auto-created)
+```
 
-## Artifacts
+## How It Works
 
-- **deadline-tracker** (React + Vite, preview at `/`): Student Deadline Tracker frontend
-- **api-server** (Express 5, preview at `/api`): Backend API server
+1. PHP built-in server starts on port 3000 (`php -S 0.0.0.0:3000 -t php-app router.php`)
+2. `router.php` routes all `/api/*` requests to `api.php`, serves static files otherwise
+3. `api.php` handles CRUD operations on the `assignments` table in SQLite
+4. `db.php` creates the table if it doesn't exist and seeds sample data on first run
+5. Frontend JS uses `fetch()` to call the PHP API and render the UI dynamically
 
-## Database Schema
+## API Endpoints
 
-- `assignments` table: id, title, course, description, due_date, status (pending/done), priority (low/medium/high), created_at
+- `GET    /api/assignments`         — list all assignments
+- `GET    /api/assignments/summary` — get summary stats
+- `GET    /api/assignments/{id}`    — get one assignment
+- `POST   /api/assignments`         — create a new assignment
+- `PATCH  /api/assignments/{id}`    — update an assignment (title, status, etc.)
+- `DELETE /api/assignments/{id}`    — delete an assignment
+
+## Database Schema (SQLite)
+
+```sql
+CREATE TABLE assignments (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    title       TEXT    NOT NULL,
+    course      TEXT    NOT NULL,
+    description TEXT,
+    due_date    TEXT    NOT NULL,
+    status      TEXT    NOT NULL DEFAULT 'pending',
+    priority    TEXT    NOT NULL DEFAULT 'medium',
+    created_at  TEXT    NOT NULL DEFAULT (datetime('now'))
+)
+```
 
 ## Features
 
 - Add assignments with title, course, description, due date, priority
-- Live countdown timers on each assignment card
+- Live countdown timers (updates every second)
 - Mark assignments as done/pending
 - Delete assignments
-- Summary stats bar (total, pending, done, overdue, due soon)
+- Summary stats bar (total, pending, due soon, overdue, done)
 - Filter tabs (All / Pending / Done / Overdue)
-- Browser notifications for assignments due within 24h
-
-See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.
+- Browser notifications + in-page banner for assignments due within 24h
+- Color-coded priority badges (low=green, medium=orange, high=red)
