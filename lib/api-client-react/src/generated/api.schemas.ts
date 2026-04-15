@@ -8,3 +8,82 @@
 export interface HealthStatus {
   status: string;
 }
+
+export type AssignmentStatus =
+  (typeof AssignmentStatus)[keyof typeof AssignmentStatus];
+
+export const AssignmentStatus = {
+  pending: "pending",
+  done: "done",
+} as const;
+
+export type AssignmentPriority =
+  (typeof AssignmentPriority)[keyof typeof AssignmentPriority];
+
+export const AssignmentPriority = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export interface Assignment {
+  id: number;
+  title: string;
+  course: string;
+  description?: string | null;
+  dueDate: string;
+  status: AssignmentStatus;
+  priority: AssignmentPriority;
+  createdAt: string;
+}
+
+export type CreateAssignmentBodyPriority =
+  (typeof CreateAssignmentBodyPriority)[keyof typeof CreateAssignmentBodyPriority];
+
+export const CreateAssignmentBodyPriority = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export interface CreateAssignmentBody {
+  title: string;
+  course: string;
+  description?: string | null;
+  dueDate: string;
+  priority: CreateAssignmentBodyPriority;
+}
+
+export type UpdateAssignmentBodyStatus =
+  (typeof UpdateAssignmentBodyStatus)[keyof typeof UpdateAssignmentBodyStatus];
+
+export const UpdateAssignmentBodyStatus = {
+  pending: "pending",
+  done: "done",
+} as const;
+
+export type UpdateAssignmentBodyPriority =
+  (typeof UpdateAssignmentBodyPriority)[keyof typeof UpdateAssignmentBodyPriority];
+
+export const UpdateAssignmentBodyPriority = {
+  low: "low",
+  medium: "medium",
+  high: "high",
+} as const;
+
+export interface UpdateAssignmentBody {
+  title?: string;
+  course?: string;
+  description?: string | null;
+  dueDate?: string;
+  status?: UpdateAssignmentBodyStatus;
+  priority?: UpdateAssignmentBodyPriority;
+}
+
+export interface AssignmentsSummary {
+  total: number;
+  pending: number;
+  done: number;
+  overdue: number;
+  dueSoon: number;
+}

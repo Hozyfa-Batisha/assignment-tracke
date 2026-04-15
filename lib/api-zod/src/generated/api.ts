@@ -14,3 +14,92 @@ import * as zod from "zod";
 export const HealthCheckResponse = zod.object({
   status: zod.string(),
 });
+
+/**
+ * @summary List all assignments
+ */
+export const ListAssignmentsResponseItem = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  course: zod.string(),
+  description: zod.string().nullish(),
+  dueDate: zod.coerce.date(),
+  status: zod.enum(["pending", "done"]),
+  priority: zod.enum(["low", "medium", "high"]),
+  createdAt: zod.coerce.date(),
+});
+export const ListAssignmentsResponse = zod.array(ListAssignmentsResponseItem);
+
+/**
+ * @summary Create a new assignment
+ */
+export const CreateAssignmentBody = zod.object({
+  title: zod.string(),
+  course: zod.string(),
+  description: zod.string().nullish(),
+  dueDate: zod.coerce.date(),
+  priority: zod.enum(["low", "medium", "high"]),
+});
+
+/**
+ * @summary Get summary stats
+ */
+export const GetAssignmentsSummaryResponse = zod.object({
+  total: zod.number(),
+  pending: zod.number(),
+  done: zod.number(),
+  overdue: zod.number(),
+  dueSoon: zod.number(),
+});
+
+/**
+ * @summary Get an assignment by ID
+ */
+export const GetAssignmentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const GetAssignmentResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  course: zod.string(),
+  description: zod.string().nullish(),
+  dueDate: zod.coerce.date(),
+  status: zod.enum(["pending", "done"]),
+  priority: zod.enum(["low", "medium", "high"]),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Update an assignment
+ */
+export const UpdateAssignmentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const UpdateAssignmentBody = zod.object({
+  title: zod.string().optional(),
+  course: zod.string().optional(),
+  description: zod.string().nullish(),
+  dueDate: zod.coerce.date().optional(),
+  status: zod.enum(["pending", "done"]).optional(),
+  priority: zod.enum(["low", "medium", "high"]).optional(),
+});
+
+export const UpdateAssignmentResponse = zod.object({
+  id: zod.number(),
+  title: zod.string(),
+  course: zod.string(),
+  description: zod.string().nullish(),
+  dueDate: zod.coerce.date(),
+  status: zod.enum(["pending", "done"]),
+  priority: zod.enum(["low", "medium", "high"]),
+  createdAt: zod.coerce.date(),
+});
+
+/**
+ * @summary Delete an assignment
+ */
+export const DeleteAssignmentParams = zod.object({
+  id: zod.coerce.number(),
+});

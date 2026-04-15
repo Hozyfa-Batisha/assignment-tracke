@@ -6,4 +6,13 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./assignment";
+export * from "./assignmentPriority";
+export * from "./assignmentsSummary";
+export * from "./assignmentStatus";
+export * from "./createAssignmentBody";
+export * from "./createAssignmentBodyPriority";
 export * from "./healthStatus";
+export * from "./updateAssignmentBody";
+export * from "./updateAssignmentBodyPriority";
+export * from "./updateAssignmentBodyStatus";
