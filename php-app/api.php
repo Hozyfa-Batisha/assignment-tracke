@@ -2,10 +2,11 @@
 /**
  * api.php
  * REST API endpoints for the Deadline Tracker.
+ * Requires an active session (user must be logged in).
  *
  * Routes:
- *   GET    /api/assignments          - List all assignments
- *   GET    /api/assignments/summary  - Get summary stats
+ *   GET    /api/assignments          - List current user's assignments
+ *   GET    /api/assignments/summary  - Summary stats for current user
  *   GET    /api/assignments/{id}     - Get one assignment
  *   POST   /api/assignments          - Create assignment
  *   PATCH  /api/assignments/{id}     - Update assignment
@@ -14,37 +15,45 @@
 
 require __DIR__ . '/db.php';
 
-// Set response headers
 header('Content-Type: application/json');
 header('Access-Control-Allow-Origin: *');
 header('Access-Control-Allow-Methods: GET, POST, PATCH, DELETE, OPTIONS');
 header('Access-Control-Allow-Headers: Content-Type');
+header('Access-Control-Allow-Credentials: true');
 
-// Handle preflight OPTIONS request
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     http_response_code(204);
     exit;
 }
 
+// ── Auth check ────────────────────────────────────────────────────────────────
+if (empty($_SESSION['user_id'])) {
+    http_response_code(401);
+    echo json_encode(['error' => 'Not authenticated. Please log in.']);
+    exit;
+}
+
+$userId = (int)$_SESSION['user_id'];
 $method = $_SERVER['REQUEST_METHOD'];
 $path   = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 
-// Remove /api prefix and split path into segments
+// Remove /api prefix
 $path     = preg_replace('#^/api#', '', $path);
 $segments = array_values(array_filter(explode('/', $path)));
 
-// Connect to database
 $db = getDB();
 
-// ─── Route: /api/assignments ─────────────────────────────────────────────────
-if (count($segments) === 0 || $segments[0] === 'assignments') {
+// ─── Route: /api/assignments ──────────────────────────────────────────────────
+if (empty($segments) || $segments[0] === 'assignments') {
     $id = isset($segments[1]) ? (int)$segments[1] : null;
 
-    // Special route: /api/assignments/summary
-    if ($segments[1] ?? '' === 'summary') {
-        $rows = $db->query('SELECT * FROM assignments')->fetchAll();
-        $now  = time();
+    // ── GET /api/assignments/summary ─────────────────────────────────────────
+    if (isset($segments[1]) && $segments[1] === 'summary') {
+        $rows = $db->prepare('SELECT * FROM assignments WHERE user_id = ?');
+        $rows->execute([$userId]);
+        $rows = $rows->fetchAll();
 
+        $now     = time();
         $total   = count($rows);
         $pending = 0;
         $done    = 0;
@@ -69,34 +78,34 @@ if (count($segments) === 0 || $segments[0] === 'assignments') {
         exit;
     }
 
-    // GET /api/assignments
+    // ── GET /api/assignments ──────────────────────────────────────────────────
     if ($method === 'GET' && $id === null) {
-        $rows = $db->query(
-            'SELECT * FROM assignments ORDER BY due_date ASC'
-        )->fetchAll();
-        echo json_encode(array_values($rows));
+        $stmt = $db->prepare(
+            'SELECT * FROM assignments WHERE user_id = ? ORDER BY due_date ASC'
+        );
+        $stmt->execute([$userId]);
+        echo json_encode(array_values($stmt->fetchAll()));
         exit;
     }
 
-    // GET /api/assignments/{id}
+    // ── GET /api/assignments/{id} ─────────────────────────────────────────────
     if ($method === 'GET' && $id) {
-        $stmt = $db->prepare('SELECT * FROM assignments WHERE id = ?');
-        $stmt->execute([$id]);
+        $stmt = $db->prepare('SELECT * FROM assignments WHERE id = ? AND user_id = ?');
+        $stmt->execute([$id, $userId]);
         $row = $stmt->fetch();
         if (!$row) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
         echo json_encode($row);
         exit;
     }
 
-    // POST /api/assignments
+    // ── POST /api/assignments ─────────────────────────────────────────────────
     if ($method === 'POST') {
-        $body = json_decode(file_get_contents('php://input'), true);
-
-        $title    = trim($body['title']    ?? '');
-        $course   = trim($body['course']   ?? '');
-        $due_date = trim($body['due_date'] ?? '');
-        $priority = $body['priority']      ?? 'medium';
-        $description = $body['description'] ?? null;
+        $body        = json_decode(file_get_contents('php://input'), true) ?? [];
+        $title       = trim($body['title']       ?? '');
+        $course      = trim($body['course']      ?? '');
+        $due_date    = trim($body['due_date']    ?? '');
+        $priority    = $body['priority']         ?? 'medium';
+        $description = $body['description']      ?? null;
 
         if (!$title || !$course || !$due_date) {
             http_response_code(400);
@@ -104,33 +113,30 @@ if (count($segments) === 0 || $segments[0] === 'assignments') {
             exit;
         }
 
-        $validPriorities = ['low', 'medium', 'high'];
-        if (!in_array($priority, $validPriorities)) {
+        if (!in_array($priority, ['low', 'medium', 'high'])) {
             http_response_code(400);
             echo json_encode(['error' => 'priority must be low, medium, or high']);
             exit;
         }
 
         $stmt = $db->prepare("
-            INSERT INTO assignments (title, course, description, due_date, priority, status)
-            VALUES (?, ?, ?, ?, ?, 'pending')
+            INSERT INTO assignments (user_id, title, course, description, due_date, priority, status)
+            VALUES (?, ?, ?, ?, ?, ?, 'pending')
         ");
-        $stmt->execute([$title, $course, $description, $due_date, $priority]);
+        $stmt->execute([$userId, $title, $course, $description ?: null, $due_date, $priority]);
         $newId = $db->lastInsertId();
 
-        $new = $db->prepare('SELECT * FROM assignments WHERE id = ?');
-        $new->execute([$newId]);
+        $row = $db->prepare('SELECT * FROM assignments WHERE id = ?');
+        $row->execute([$newId]);
 
         http_response_code(201);
-        echo json_encode($new->fetch());
+        echo json_encode($row->fetch());
         exit;
     }
 
-    // PATCH /api/assignments/{id}
+    // ── PATCH /api/assignments/{id} ───────────────────────────────────────────
     if ($method === 'PATCH' && $id) {
-        $body = json_decode(file_get_contents('php://input'), true);
-
-        // Build the SET clause dynamically from provided fields
+        $body    = json_decode(file_get_contents('php://input'), true) ?? [];
         $allowed = ['title', 'course', 'description', 'due_date', 'status', 'priority'];
         $set     = [];
         $values  = [];
@@ -149,27 +155,29 @@ if (count($segments) === 0 || $segments[0] === 'assignments') {
         }
 
         $values[] = $id;
-        $stmt = $db->prepare('UPDATE assignments SET ' . implode(', ', $set) . ' WHERE id = ?');
+        $values[] = $userId;
+        $stmt = $db->prepare(
+            'UPDATE assignments SET ' . implode(', ', $set) . ' WHERE id = ? AND user_id = ?'
+        );
         $stmt->execute($values);
 
-        $updated = $db->prepare('SELECT * FROM assignments WHERE id = ?');
-        $updated->execute([$id]);
-        $row = $updated->fetch();
+        $row = $db->prepare('SELECT * FROM assignments WHERE id = ? AND user_id = ?');
+        $row->execute([$id, $userId]);
+        $updated = $row->fetch();
 
-        if (!$row) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
-        echo json_encode($row);
+        if (!$updated) { http_response_code(404); echo json_encode(['error' => 'Not found']); exit; }
+        echo json_encode($updated);
         exit;
     }
 
-    // DELETE /api/assignments/{id}
+    // ── DELETE /api/assignments/{id} ──────────────────────────────────────────
     if ($method === 'DELETE' && $id) {
-        $stmt = $db->prepare('DELETE FROM assignments WHERE id = ?');
-        $stmt->execute([$id]);
+        $stmt = $db->prepare('DELETE FROM assignments WHERE id = ? AND user_id = ?');
+        $stmt->execute([$id, $userId]);
         http_response_code(204);
         exit;
     }
 }
 
-// Fallback: 404
 http_response_code(404);
 echo json_encode(['error' => 'Not found']);

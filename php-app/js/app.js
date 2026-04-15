@@ -1,176 +1,132 @@
 /**
- * app.js — DeadlineZone Frontend Logic
- * Plain JavaScript (no frameworks) for the Student Deadline Tracker.
+ * app.js
+ * Dashboard + Add Assignment logic.
+ * Requires auth.js to be loaded first (handles auth check + logout).
  */
 
-/* ============================================================
-   API HELPERS
-   All API calls go through these functions.
-   The backend is PHP at /api/assignments
-   ============================================================ */
-
-const API_BASE = '/api/assignments';
-
-/**
- * Generic fetch wrapper that returns JSON or throws an error.
- */
-async function apiFetch(url, options = {}) {
-  const response = await fetch(url, {
+// ─── API wrapper ─────────────────────────────────────────────────────────────
+async function apiFetch(path, options = {}) {
+  const res = await fetch(path, {
+    credentials: 'same-origin',
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
 
-  if (response.status === 204) return null; // No content (DELETE success)
+  if (res.status === 204) return null;
 
-  const data = await response.json();
-  if (!response.ok) {
-    throw new Error(data.error || 'Something went wrong');
-  }
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
   return data;
 }
 
-/** GET /api/assignments — fetch all assignments */
-async function fetchAssignments() {
-  return apiFetch(API_BASE);
+async function getAssignments()       { return apiFetch('/api/assignments'); }
+async function getSummary()           { return apiFetch('/api/assignments/summary'); }
+async function createAssignment(body) {
+  return apiFetch('/api/assignments', { method: 'POST', body: JSON.stringify(body) });
 }
-
-/** GET /api/assignments/summary — fetch summary stats */
-async function fetchSummary() {
-  return apiFetch(API_BASE + '/summary');
+async function updateAssignment(id, body) {
+  return apiFetch(`/api/assignments/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
 }
-
-/** POST /api/assignments — create a new assignment */
-async function createAssignment(data) {
-  return apiFetch(API_BASE, {
-    method: 'POST',
-    body: JSON.stringify(data),
-  });
-}
-
-/** PATCH /api/assignments/{id} — update an assignment */
-async function updateAssignment(id, data) {
-  return apiFetch(`${API_BASE}/${id}`, {
-    method: 'PATCH',
-    body: JSON.stringify(data),
-  });
-}
-
-/** DELETE /api/assignments/{id} — delete an assignment */
 async function deleteAssignment(id) {
-  return apiFetch(`${API_BASE}/${id}`, { method: 'DELETE' });
+  return apiFetch(`/api/assignments/${id}`, { method: 'DELETE' });
 }
 
-/* ============================================================
-   COUNTDOWN HELPER
-   Calculates and formats the time remaining until a due date.
-   ============================================================ */
-
-/**
- * Returns an object with { text, cssClass } for the countdown display.
- * cssClass is one of: overdue, urgent, normal, safe, done
- */
-function getCountdown(dueDateStr, status) {
-  if (status === 'done') {
-    return { text: 'Completed', cssClass: 'done' };
-  }
-
-  const now    = new Date();
-  const due    = new Date(dueDateStr);
-  const diffMs = due - now;
-
-  if (diffMs < 0) {
-    return { text: 'OVERDUE', cssClass: 'overdue' };
-  }
-
-  const diffSec  = Math.floor(diffMs / 1000);
-  const days     = Math.floor(diffSec / 86400);
-  const hours    = Math.floor((diffSec % 86400) / 3600);
-  const minutes  = Math.floor((diffSec % 3600) / 60);
-
-  let text;
-  if (days > 0) {
-    text = `${days}d ${hours}h left`;
-  } else if (hours > 0) {
-    text = `${hours}h ${minutes}m left`;
-  } else {
-    text = `${minutes}m left`;
-  }
-
-  let cssClass;
-  if (diffMs < 86400000)      cssClass = 'urgent'; // < 1 day
-  else if (diffMs < 259200000) cssClass = 'normal'; // < 3 days
-  else                         cssClass = 'safe';
-
-  return { text, cssClass };
-}
-
-/**
- * Formats a date string into a human-readable local date/time.
- * e.g. "Apr 18, 11:59 PM"
- */
-function formatDueDate(dueDateStr) {
-  const d = new Date(dueDateStr);
-  return d.toLocaleString('en-US', {
-    month: 'short', day: 'numeric',
-    hour: 'numeric', minute: '2-digit',
+// ─── Format helpers ───────────────────────────────────────────────────────────
+function formatDueDate(dateStr) {
+  const d = new Date(dateStr);
+  return 'Due: ' + d.toLocaleDateString(undefined, {
+    month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit'
   });
 }
 
-/* ============================================================
-   DASHBOARD PAGE
-   ============================================================ */
+function getCountdown(dateStr, status) {
+  if (status === 'done') return { label: 'Completed', cls: 'done', icon: '' };
 
-// Current filter state
-let currentFilter  = 'all';
-let allAssignments = [];
-let countdownTimer = null;
+  const now  = Date.now();
+  const due  = new Date(dateStr).getTime();
+  const diff = due - now;
 
-/**
- * Builds and injects a single assignment card into the DOM.
- */
-function buildCard(assignment) {
-  const { id, title, course, description, due_date, status, priority } = assignment;
-  const countdown = getCountdown(due_date, status);
+  if (diff < 0) {
+    const ageH = Math.floor(-diff / 3600000);
+    const ageD = Math.floor(ageH / 24);
+    return {
+      label: ageD > 0 ? `${ageD}d overdue` : `${ageH}h overdue`,
+      cls: 'overdue',
+      icon: '!',
+    };
+  }
 
-  const card = document.createElement('div');
-  card.className = `card priority-${priority} status-${status}`;
-  card.dataset.id = id;
+  const totalMins = Math.floor(diff / 60000);
+  const mins  = totalMins % 60;
+  const hours = Math.floor(totalMins / 60) % 24;
+  const days  = Math.floor(totalMins / 1440);
 
-  // Countdown icon
-  const icons = { overdue: '!', urgent: '!', normal: '⏰', safe: '⏰', done: '✓' };
-
-  card.innerHTML = `
-    <div class="card-top">
-      <div class="card-badges">
-        <span class="badge badge-course">${escHtml(course)}</span>
-        <span class="badge badge-${priority}">${priority.toUpperCase()}</span>
-        ${status === 'done' ? '<span class="badge badge-done">DONE</span>' : ''}
-      </div>
-      <div class="card-actions">
-        <button class="btn-icon btn-delete" data-id="${id}" title="Delete assignment">&#128465;</button>
-      </div>
-    </div>
-
-    <div class="card-title">${escHtml(title)}</div>
-
-    ${description ? `<div class="card-description">${escHtml(description)}</div>` : ''}
-
-    <div class="card-countdown ${countdown.cssClass}">
-      <span>${icons[countdown.cssClass] || '⏰'}</span>
-      <span class="countdown-text">${countdown.text}</span>
-    </div>
-    <div class="card-due-date">Due: ${formatDueDate(due_date)}</div>
-
-    <button class="card-toggle-btn" data-id="${id}" data-status="${status}">
-      ${status === 'pending' ? '&#10003; Mark as Done' : '↩ Mark as Pending'}
-    </button>
-  `;
-
-  return card;
+  let label, cls, icon;
+  if (days === 0) {
+    label = hours > 0 ? `${hours}h ${mins}m left` : `${mins}m left`;
+    cls   = 'urgent';
+    icon  = '!';
+  } else if (days < 3) {
+    label = `${days}d ${hours}h left`;
+    cls   = 'normal';
+    icon  = '&#9200;';
+  } else {
+    label = `${days}d ${hours}h left`;
+    cls   = 'safe';
+    icon  = '&#9200;';
+  }
+  return { label, cls, icon };
 }
 
-/** Escape HTML to prevent XSS */
-function escHtml(str) {
+// ─── Build assignment card HTML ───────────────────────────────────────────────
+function buildCard(assignment) {
+  const { id, title, course, description, due_date, status } = assignment;
+
+  // Safe fallback: prevents "can't access property toUpperCase, priority is undefined"
+  const priority = assignment.priority || 'medium';
+
+  const countdown = getCountdown(due_date, status);
+  const dueLine   = formatDueDate(due_date);
+  const descHTML  = description
+    ? `<p class="card-description">${escapeHTML(description)}</p>`
+    : '';
+  const toggleLabel = status === 'done' ? 'Mark as Pending' : 'Mark as Done';
+
+  return `
+    <div class="card priority-${priority} status-${status}" data-id="${id}" id="card-${id}">
+      <div class="card-top">
+        <div class="card-badges">
+          <span class="badge badge-course">${escapeHTML(course)}</span>
+          <span class="badge badge-${priority}">${priority.toUpperCase()}</span>
+          ${status === 'done' ? `<span class="badge badge-done">DONE</span>` : ''}
+        </div>
+        <div class="card-actions">
+          <button class="btn-icon btn-delete"
+            onclick="handleDelete(${id})"
+            title="Delete assignment">&#128465;</button>
+        </div>
+      </div>
+
+      <h3 class="card-title">${escapeHTML(title)}</h3>
+      ${descHTML}
+
+      <div class="card-countdown ${countdown.cls}">
+        <span>${countdown.icon}</span>
+        <span>${countdown.label}</span>
+      </div>
+      <p class="card-due-date">${dueLine}</p>
+
+      <button class="card-toggle-btn"
+        onclick="handleToggle(${id})"
+        data-testid="button-toggle-${id}">
+        ${toggleLabel}
+      </button>
+    </div>
+  `;
+}
+
+function escapeHTML(str) {
+  if (!str) return '';
   return String(str)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
@@ -178,290 +134,262 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
-/** Returns true if the assignment matches the current filter */
-function matchesFilter(assignment) {
-  const now = new Date();
-  switch (currentFilter) {
-    case 'pending': return assignment.status === 'pending';
-    case 'done':    return assignment.status === 'done';
-    case 'overdue': return assignment.status === 'pending' && new Date(assignment.due_date) < now;
-    default:        return true;
-  }
-}
+// ─── State ────────────────────────────────────────────────────────────────────
+let allAssignments = [];
+let activeFilter   = 'all';
 
-/** Renders the assignment cards grid */
+// ─── Render cards ─────────────────────────────────────────────────────────────
 function renderCards(assignments) {
   const grid       = document.getElementById('cards-grid');
   const emptyState = document.getElementById('empty-state');
   if (!grid) return;
 
-  const filtered = assignments.filter(matchesFilter);
+  const now = Date.now();
+  let filtered;
 
-  grid.innerHTML = '';
+  if (activeFilter === 'all') {
+    filtered = assignments;
+  } else if (activeFilter === 'pending') {
+    filtered = assignments.filter(a => a.status === 'pending');
+  } else if (activeFilter === 'done') {
+    filtered = assignments.filter(a => a.status === 'done');
+  } else if (activeFilter === 'overdue') {
+    filtered = assignments.filter(a =>
+      a.status === 'pending' && new Date(a.due_date).getTime() < now
+    );
+  } else {
+    filtered = assignments;
+  }
 
   if (filtered.length === 0) {
-    emptyState.classList.remove('hidden');
+    grid.innerHTML = '';
+    emptyState && emptyState.classList.remove('hidden');
     return;
   }
+  emptyState && emptyState.classList.add('hidden');
+  grid.innerHTML = filtered.map(buildCard).join('');
+}
 
-  emptyState.classList.add('hidden');
+// ─── Update summary stats bar ─────────────────────────────────────────────────
+async function refreshSummary() {
+  try {
+    const s = await getSummary();
+    const set = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+    set('stat-total',    s.total);
+    set('stat-pending',  s.pending);
+    set('stat-due-soon', s.dueSoon);
+    set('stat-overdue',  s.overdue);
+    set('stat-done',     s.done);
+  } catch (_) {}
+}
 
-  filtered.forEach(assignment => {
-    grid.appendChild(buildCard(assignment));
-  });
+// ─── Live countdown ticker ────────────────────────────────────────────────────
+function startTicker() {
+  setInterval(() => {
+    allAssignments.forEach(a => {
+      const card = document.getElementById(`card-${a.id}`);
+      if (!card) return;
+      const cd = card.querySelector('.card-countdown');
+      if (!cd) return;
+      const c = getCountdown(a.due_date, a.status);
+      cd.className = `card-countdown ${c.cls}`;
+      cd.innerHTML = `<span>${c.icon}</span><span>${c.label}</span>`;
+    });
+  }, 1000);
+}
 
-  // Attach event listeners
-  grid.querySelectorAll('.btn-delete').forEach(btn => {
-    btn.addEventListener('click', handleDelete);
-  });
-
-  grid.querySelectorAll('.card-toggle-btn').forEach(btn => {
-    btn.addEventListener('click', handleToggle);
+// ─── Filter buttons ───────────────────────────────────────────────────────────
+function initFilters() {
+  document.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      activeFilter = btn.dataset.filter;
+      renderCards(allAssignments);
+    });
   });
 }
 
-/** Updates countdown text in all visible cards (runs every second) */
-function tickCountdowns() {
-  document.querySelectorAll('.card').forEach(card => {
-    const id = parseInt(card.dataset.id);
-    const assignment = allAssignments.find(a => a.id === id);
-    if (!assignment) return;
+// ─── Notification banner ──────────────────────────────────────────────────────
+function checkNotifications(assignments) {
+  const now    = Date.now();
+  const urgent = assignments.filter(a =>
+    a.status === 'pending' &&
+    new Date(a.due_date).getTime() > now &&
+    new Date(a.due_date).getTime() - now <= 86_400_000
+  );
 
-    const countdown = getCountdown(assignment.due_date, assignment.status);
-    const textEl    = card.querySelector('.countdown-text');
-    const wrapEl    = card.querySelector('.card-countdown');
-
-    if (textEl)  textEl.textContent = countdown.text;
-    if (wrapEl) {
-      wrapEl.className = `card-countdown ${countdown.cssClass}`;
+  if (urgent.length > 0) {
+    const banner = document.getElementById('notif-banner');
+    const text   = document.getElementById('notif-text');
+    if (!banner || !text) return;
+    if ('Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission();
     }
-  });
-}
-
-/** Loads summary stats from the API and updates the stat cards */
-async function loadSummary() {
-  try {
-    const summary = await fetchSummary();
-    document.getElementById('stat-total').textContent    = summary.total;
-    document.getElementById('stat-pending').textContent  = summary.pending;
-    document.getElementById('stat-due-soon').textContent = summary.dueSoon;
-    document.getElementById('stat-overdue').textContent  = summary.overdue;
-    document.getElementById('stat-done').textContent     = summary.done;
-  } catch (err) {
-    console.error('Failed to load summary:', err);
+    text.textContent = urgent.length === 1
+      ? 'Heads up! 1 assignment is due within 24 hours.'
+      : `Heads up! ${urgent.length} assignments are due within 24 hours.`;
+    banner.classList.remove('hidden');
   }
 }
 
-/** Loads assignments and renders the page */
-async function loadDashboard() {
+// ─── Toggle done / pending ────────────────────────────────────────────────────
+async function handleToggle(id) {
+  const existing = allAssignments.find(a => a.id === id);
+  if (!existing) return;
+
+  const newStatus = existing.status === 'done' ? 'pending' : 'done';
+
   try {
-    allAssignments = await fetchAssignments();
+    const updated = await updateAssignment(id, { status: newStatus });
+
+    // Merge to preserve any fields that the API might not return
+    const index = allAssignments.findIndex(a => a.id === id);
+    if (index !== -1) {
+      allAssignments[index] = { ...existing, ...updated };
+    }
+
     renderCards(allAssignments);
-    await loadSummary();
-    checkNotifications(allAssignments);
+    refreshSummary();
   } catch (err) {
-    const grid = document.getElementById('cards-grid');
-    if (grid) grid.innerHTML = `<div class="loading" style="color:var(--clr-red)">Error: ${err.message}</div>`;
+    console.error('Error updating assignment:', err.message);
   }
 }
 
-/** Handles deleting an assignment */
-async function handleDelete(event) {
-  const id = parseInt(event.currentTarget.dataset.id);
-  if (!confirm('Delete this assignment?')) return;
-
+// ─── Delete ───────────────────────────────────────────────────────────────────
+async function handleDelete(id) {
+  if (!confirm('Delete this assignment? This cannot be undone.')) return;
   try {
     await deleteAssignment(id);
     allAssignments = allAssignments.filter(a => a.id !== id);
     renderCards(allAssignments);
-    await loadSummary();
+    refreshSummary();
   } catch (err) {
-    alert('Error deleting assignment: ' + err.message);
+    console.error('Error deleting assignment:', err.message);
   }
 }
 
-/** Handles toggling done/pending status */
-async function handleToggle(event) {
-  const id        = parseInt(event.currentTarget.dataset.id);
-  const curStatus = event.currentTarget.dataset.status;
-  const newStatus = curStatus === 'pending' ? 'done' : 'pending';
-
-  try {
-    const updated = await updateAssignment(id, { status: newStatus });
-    const index   = allAssignments.findIndex(a => a.id === id);
-    if (index !== -1) allAssignments[index] = updated;
-    renderCards(allAssignments);
-    await loadSummary();
-  } catch (err) {
-    alert('Error updating assignment: ' + err.message);
-  }
-}
-
-/* ============================================================
-   BROWSER NOTIFICATIONS
-   Asks for permission and alerts the user if any assignment
-   is due within the next 24 hours.
-   ============================================================ */
-
-function checkNotifications(assignments) {
-  const now    = new Date();
-  const in24h  = new Date(now.getTime() + 86400000);
-
-  const dueSoon = assignments.filter(a =>
-    a.status === 'pending' &&
-    new Date(a.due_date) > now &&
-    new Date(a.due_date) <= in24h
-  );
-
-  if (dueSoon.length === 0) return;
-
-  // Show in-page banner
-  const banner = document.getElementById('notif-banner');
-  const text   = document.getElementById('notif-text');
-  if (banner && text) {
-    text.textContent = `Heads up! ${dueSoon.length} assignment${dueSoon.length > 1 ? 's are' : ' is'} due within 24 hours.`;
-    banner.classList.remove('hidden');
-    setTimeout(() => banner.classList.add('hidden'), 8000);
-  }
-
-  // Try browser notification
-  if ('Notification' in window) {
-    Notification.requestPermission().then(permission => {
-      if (permission === 'granted') {
-        dueSoon.forEach(a => {
-          new Notification('DeadlineZone - Due Soon!', {
-            body: `"${a.title}" (${a.course}) is due soon.`,
-            icon: '/favicon.ico',
-          });
-        });
-      }
-    });
-  }
-}
-
-/* ============================================================
-   ADD ASSIGNMENT FORM
-   ============================================================ */
-
+// ─── Add Assignment form ───────────────────────────────────────────────────────
 function initAddForm() {
   const form = document.getElementById('add-form');
   if (!form) return;
 
-  // Set minimum date to now
+  // Set min date to right now and default to tomorrow at noon
   const dueDateInput = document.getElementById('due_date');
   if (dueDateInput) {
+    const pad = n => String(n).padStart(2, '0');
     const now = new Date();
-    now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-    dueDateInput.min = now.toISOString().slice(0, 16);
+    dueDateInput.min = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    const tomorrow = new Date(now);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    dueDateInput.value = `${tomorrow.getFullYear()}-${pad(tomorrow.getMonth() + 1)}-${pad(tomorrow.getDate())}T12:00`;
   }
 
-  form.addEventListener('submit', async function (event) {
-    event.preventDefault();
+  form.addEventListener('submit', async (e) => {
+    e.preventDefault();
 
-    // Clear previous errors
-    clearFormErrors();
+    const errorBox = document.getElementById('form-error');
+    if (errorBox) errorBox.classList.add('hidden');
 
-    const title       = document.getElementById('title').value.trim();
-    const course      = document.getElementById('course').value.trim();
-    const description = document.getElementById('description').value.trim();
-    const due_date    = document.getElementById('due_date').value;
-    const priority    = document.getElementById('priority').value;
+    const title       = form.title.value.trim();
+    const course      = form.course.value.trim();
+    const description = form.description ? form.description.value.trim() : '';
+    const due_date    = form.due_date.value;
+    const priority    = form.priority.value;
 
-    // Validate
-    let hasError = false;
+    // Validate required fields
+    let valid = true;
+    if (!title)    { markInvalid('title',    'title-error');    valid = false; }
+    else            markValid('title',    'title-error');
+    if (!course)   { markInvalid('course',   'course-error');   valid = false; }
+    else            markValid('course',   'course-error');
+    if (!due_date) { markInvalid('due_date', 'due-date-error'); valid = false; }
+    else            markValid('due_date', 'due-date-error');
 
-    if (!title) {
-      showFieldError('title', 'title-error');
-      hasError = true;
+    if (!valid) return;
+
+    // Validate date is in the future
+    if (new Date(due_date).getTime() <= Date.now()) {
+      if (errorBox) {
+        errorBox.textContent = 'Please select a due date and time in the future.';
+        errorBox.classList.remove('hidden');
+      }
+      markInvalid('due_date', 'due-date-error');
+      return;
     }
-    if (!course) {
-      showFieldError('course', 'course-error');
-      hasError = true;
-    }
-    if (!due_date) {
-      showFieldError('due_date', 'due-date-error');
-      hasError = true;
-    }
 
-    if (hasError) return;
-
-    // Disable submit button while saving
     const submitBtn = document.getElementById('submit-btn');
-    submitBtn.disabled = true;
-    submitBtn.textContent = 'Saving...';
+    if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = 'Adding...'; }
 
     try {
+      // Format: "YYYY-MM-DD HH:MM:00" (what PHP/SQLite expects)
+      const formatted = due_date.replace('T', ' ') + ':00';
       await createAssignment({
         title,
         course,
         description: description || null,
-        due_date: new Date(due_date).toISOString().replace('T', ' ').slice(0, 19),
+        due_date: formatted,
         priority,
       });
-
-      // Redirect back to dashboard on success
       window.location.href = '/';
     } catch (err) {
-      const errorDiv = document.getElementById('form-error');
-      if (errorDiv) {
-        errorDiv.textContent = 'Error: ' + err.message;
-        errorDiv.classList.remove('hidden');
+      if (errorBox) {
+        errorBox.textContent = err.message || 'Failed to add assignment. Please try again.';
+        errorBox.classList.remove('hidden');
       }
-      submitBtn.disabled = false;
-      submitBtn.textContent = 'Add Assignment';
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = 'Add Assignment'; }
     }
   });
 }
 
-function showFieldError(inputId, errorId) {
-  document.getElementById(inputId)?.classList.add('invalid');
-  document.getElementById(errorId)?.classList.remove('hidden');
+function markInvalid(fieldId, errorId) {
+  const input = document.getElementById(fieldId);
+  const err   = document.getElementById(errorId);
+  if (input) input.classList.add('invalid');
+  if (err)   err.classList.remove('hidden');
+}
+function markValid(fieldId, errorId) {
+  const input = document.getElementById(fieldId);
+  const err   = document.getElementById(errorId);
+  if (input) input.classList.remove('invalid');
+  if (err)   err.classList.add('hidden');
 }
 
-function clearFormErrors() {
-  document.querySelectorAll('.form-input').forEach(el => el.classList.remove('invalid'));
-  document.querySelectorAll('.field-error').forEach(el => el.classList.add('hidden'));
-  const errorDiv = document.getElementById('form-error');
-  if (errorDiv) errorDiv.classList.add('hidden');
-}
+// ─── Dashboard init ───────────────────────────────────────────────────────────
+async function initDashboard() {
+  const grid = document.getElementById('cards-grid');
 
-/* ============================================================
-   FILTER BUTTONS
-   ============================================================ */
+  try {
+    const [assignments] = await Promise.all([
+      getAssignments(),
+      refreshSummary(),
+    ]);
 
-function initFilters() {
-  const filterContainer = document.getElementById('filters');
-  if (!filterContainer) return;
-
-  filterContainer.addEventListener('click', function (event) {
-    const btn = event.target.closest('.filter-btn');
-    if (!btn) return;
-
-    filterContainer.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    currentFilter = btn.dataset.filter;
-    renderCards(allAssignments);
-  });
-}
-
-/* ============================================================
-   PAGE INIT
-   Run the right code based on the current page.
-   ============================================================ */
-
-document.addEventListener('DOMContentLoaded', function () {
-  const isDashboard = !!document.getElementById('cards-grid');
-  const isAddForm   = !!document.getElementById('add-form');
-
-  if (isDashboard) {
+    allAssignments = assignments || [];
     initFilters();
-    loadDashboard();
-
-    // Update countdowns every second
-    countdownTimer = setInterval(tickCountdowns, 1000);
+    renderCards(allAssignments);
+    checkNotifications(allAssignments);
+    startTicker();
+  } catch (err) {
+    if (grid) {
+      grid.innerHTML = `<div class="loading-card" style="color:var(--red-500);">
+        Error: ${err.message}
+      </div>`;
+    }
   }
+}
 
-  if (isAddForm) {
+// ─── Auto-detect page and init ────────────────────────────────────────────────
+(function () {
+  const path = window.location.pathname;
+  if (path.includes('add')) {
     initAddForm();
+  } else if (
+    !path.includes('login') &&
+    !path.includes('register') &&
+    !path.includes('profile')
+  ) {
+    initDashboard();
   }
-});
+})();

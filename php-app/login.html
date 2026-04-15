@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Login - DeadlineZone</title>
+  <link rel="stylesheet" href="/css/style.css" />
+</head>
+<body class="auth-body">
+
+  <div class="auth-card">
+    <div class="auth-logo">
+      <span class="logo-icon">&#9201;</span>
+      <span class="logo-text">DeadlineZone</span>
+    </div>
+    <h1 class="auth-title">Welcome back</h1>
+    <p class="auth-subtitle">Log in to track your deadlines</p>
+
+    <div class="alert alert-info" style="margin-bottom:1rem;">
+      Try <strong>demo@example.com</strong> / <strong>demo123</strong> for sample data
+    </div>
+
+    <div class="alert alert-error hidden" id="login-error"></div>
+
+    <form id="login-form" novalidate>
+      <div class="form-group">
+        <label class="form-label" for="email">Email</label>
+        <input type="email" id="email" name="email" class="form-input"
+          placeholder="your@email.com" required data-testid="input-email" />
+        <span class="field-error hidden" id="email-error">Valid email is required.</span>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="password">Password</label>
+        <input type="password" id="password" name="password" class="form-input"
+          placeholder="Your password" required data-testid="input-password" />
+        <span class="field-error hidden" id="password-error">Password is required.</span>
+      </div>
+
+      <button type="submit" class="btn btn-primary btn-full" id="login-btn" data-testid="button-login">
+        Log In
+      </button>
+    </form>
+
+    <p class="auth-switch">
+      Don't have an account? <a href="/register.html" class="auth-link">Register here</a>
+    </p>
+  </div>
+
+  <script src="/js/auth.js"></script>
+</body>
+</html>

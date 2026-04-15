@@ -11,82 +11,61 @@
   <!-- ===== HEADER ===== -->
   <header class="header">
     <div class="header-inner">
-      <div class="logo">
+      <a href="/" class="logo">
         <span class="logo-icon">&#9201;</span>
         <span class="logo-text">DeadlineZone</span>
-      </div>
+      </a>
       <nav class="nav">
-        <a href="/" class="nav-link" id="nav-home">Dashboard</a>
-        <a href="/add.html" class="nav-link active" id="nav-add">+ Add Assignment</a>
+        <a href="/" class="nav-link" data-testid="nav-dashboard">Dashboard</a>
+        <a href="/add.html" class="nav-link active" data-testid="nav-add">+ Add</a>
+        <a href="/profile.html" class="nav-link" data-testid="nav-profile" id="nav-username">Profile</a>
+        <button class="nav-btn-logout" id="logout-btn" data-testid="button-logout">Logout</button>
       </nav>
     </div>
   </header>
 
-  <!-- ===== MAIN ===== -->
   <main class="main main-narrow">
 
-    <div class="form-card">
+    <div class="form-card" style="margin-top:2rem;">
       <h1 class="form-title">Add New Assignment</h1>
       <p class="form-subtitle">Fill in the details below to track your deadline.</p>
 
-      <!-- Error message box -->
       <div class="alert alert-error hidden" id="form-error"></div>
 
       <form id="add-form" novalidate>
 
         <div class="form-group">
           <label class="form-label" for="title">Assignment Title <span class="required">*</span></label>
-          <input
-            type="text"
-            id="title"
-            name="title"
-            class="form-input"
-            placeholder="e.g. Final Project Report"
-            required
-          />
+          <input type="text" id="title" name="title" class="form-input"
+            placeholder="e.g. Final Project Report" required data-testid="input-title" />
           <span class="field-error hidden" id="title-error">Title is required.</span>
         </div>
 
         <div class="form-group">
           <label class="form-label" for="course">Course / Subject <span class="required">*</span></label>
-          <input
-            type="text"
-            id="course"
-            name="course"
-            class="form-input"
-            placeholder="e.g. Web Programming"
-            required
-          />
+          <input type="text" id="course" name="course" class="form-input"
+            placeholder="e.g. Web Programming" required data-testid="input-course" />
           <span class="field-error hidden" id="course-error">Course is required.</span>
         </div>
 
         <div class="form-group">
-          <label class="form-label" for="description">Description (optional)</label>
-          <textarea
-            id="description"
-            name="description"
-            class="form-input form-textarea"
-            placeholder="Any extra notes about this assignment..."
-            rows="3"
-          ></textarea>
+          <label class="form-label" for="description">Description <span class="text-muted">(optional)</span></label>
+          <textarea id="description" name="description" class="form-input form-textarea"
+            placeholder="Any extra notes about this assignment..." rows="3" data-testid="input-description"></textarea>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label class="form-label" for="due_date">Due Date &amp; Time <span class="required">*</span></label>
-            <input
-              type="datetime-local"
-              id="due_date"
-              name="due_date"
-              class="form-input"
-              required
-            />
+            <input type="datetime-local" id="due_date" name="due_date" class="form-input"
+              required data-testid="input-due-date" />
+            <span class="field-hint">Select a future date and time</span>
             <span class="field-error hidden" id="due-date-error">Due date is required.</span>
           </div>
 
           <div class="form-group">
             <label class="form-label" for="priority">Priority <span class="required">*</span></label>
-            <select id="priority" name="priority" class="form-input form-select">
+            <select id="priority" name="priority" class="form-input form-select" data-testid="select-priority">
               <option value="low">Low</option>
               <option value="medium" selected>Medium</option>
               <option value="high">High</option>
@@ -96,7 +75,9 @@
 
         <div class="form-actions">
           <a href="/" class="btn btn-outline">Cancel</a>
-          <button type="submit" class="btn btn-primary" id="submit-btn">Add Assignment</button>
+          <button type="submit" class="btn btn-primary" id="submit-btn" data-testid="button-submit">
+            Add Assignment
+          </button>
         </div>
 
       </form>
@@ -104,6 +85,7 @@
 
   </main>
 
+  <script src="/js/auth.js"></script>
   <script src="/js/app.js"></script>
 </body>
 </html>
